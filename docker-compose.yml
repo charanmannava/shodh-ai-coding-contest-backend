@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: contest
+      POSTGRES_USER: contest
+      POSTGRES_PASSWORD: contest
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contest -d contest"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "55432:5432"
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://contest:contest@db:5432/contest
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+  worker:
+    build: .
+    command: python -m app.workers.judge_worker
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://contest:contest@db:5432/contest
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/contest-judge:/tmp/contest-judge
+    deploy:
+      replicas: 2
+
+  migrate:
+    build: .
+    command: alembic upgrade head
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://contest:contest@db:5432/contest
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
