@@ -8,4 +8,6 @@ htmlcov/
 *.db
 results/*
 !results/.gitkeep
+!results/load-test.json
+!results/queue-query-plan.json
 !.DS_Store
